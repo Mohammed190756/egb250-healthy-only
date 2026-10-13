@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite the paper."
+title: "Healthy-only anomaly detection on the EGB-250 reciprocating compressor (analysis code)"
+authors:
+  - family-names: "Ghulam Mohiuddin"
+    given-names: "Mohammed Juneduddin"
+    affiliation: "SVKM's NMIMS, India"
+  - family-names: "Deshmukh"
+    given-names: "Ashish"
+    affiliation: "SVKM's NMIMS, India"
+license: MIT
