@@ -45,7 +45,7 @@ fs = sorted(pf); S['fold_rho'] = [float(spearmanr(pf[a], pf[b]).correlation) for
 pfault = project(p[p.y == 1]); phealthy = project(p[p.y == 0])
 S['group_share'] = proj.groupby(lambda c: GROUP(c)).sum().round(3).to_dict()
 S['group_share_fault'] = pfault.groupby(lambda c: GROUP(c)).sum().round(3).to_dict()
-# draw stability (as before)
+# stability of the component ranking between instance draws
 rs = []
 for (f, m), q in p.groupby(['fold', 'model']):
     t = q.groupby(['draw', 'pc'])['nabs'].mean().unstack(0)
