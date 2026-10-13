@@ -46,11 +46,6 @@ def descriptors(x, fs, nps):
     return [sd, skew(x), kurtosis(x, fisher=False), x.max()-x.min(), pk/rms, rms/mab, pk/mab,
             cen, sk, np.sqrt(Pe[m][i]), fe[m][i], np.sqrt(np.mean(ec**2))]
 
-def peak_cps(x, lo, hi):
-    x = x - x.mean(); n = len(x); N = 1 << int(np.ceil(np.log2(n)) + 2)
-    X = np.abs(np.fft.rfft(x*np.hanning(n), N)); f = np.fft.rfftfreq(N)
-    m = (f > lo) & (f < hi); return f[m][np.argmax(X[m])]
-
 def process(path):
     rel = os.path.relpath(path, ROOT)
     sub = rel.split(os.sep)[0].replace('Raw_Data_','').replace('_Faults_DB_011V0','')
@@ -62,18 +57,11 @@ def process(path):
     enc = d['Analog500k'][0,0]['TDMSAnalog500kEncoder0'].ravel()
     edges = np.flatnonzero(np.diff((enc > 0).astype(np.int8)) == 1)
     per = np.diff(edges)
-    # ---- sampling-rate consistency checks (A1) -------------------------------------
-    enc_cps = 1.0/np.median(per)                                   # shaft cycles per encoder sample
-    pr_cps = peak_cps(sig['PR3'], 0.8*10/FS25, 1.2*16/FS25)        # shaft cycles per pressure sample
-    # 51.2k module: shaft-locked periodicity of A2 envelope (2nd-stage discharge area)
-    a_cps = peak_cps(np.abs(sig['A2'][:200000]), 0.8*10/FS50, 1.2*16/FS50)
-    i_cps = peak_cps(sig['I1'], 40/FS50, 80/FS50)                  # supply fundamental, cycles/sample
+    # crankshaft speed from the encoder: one index pulse per revolution
+    shaft_hz = FS500/np.median(per)
     meta = dict(subset=sub, P=P, R=R, rec=f'{sub}_{P}_{R}',
                 n50=len(sig['A1']), n25=len(sig['PR1']), n500=len(enc),
-                shaft_hz=FS500*enc_cps, edges_total=len(edges),
-                ratio_enc_over_pr=pr_cps/enc_cps, ratio_enc_over_50=a_cps and (enc_cps and None),
-                fs25_implied=FS500*enc_cps/pr_cps, fs50_implied=FS500*enc_cps/a_cps,
-                supply_hz_at_51k2=i_cps*FS50, supply_hz_at_50k=i_cps*50000.0)
+                shaft_hz=shaft_hz, edges_total=len(edges))
     rows = []
     for w in range(NWIN):
         r = dict(rec=meta['rec'], win=w)
@@ -89,10 +77,15 @@ def process(path):
     return meta, rows
 
 if __name__ == '__main__':
-    files = sorted(glob.glob(f'{ROOT}/Raw_Data_Valve_Faults_DB_011V0/**/*.mat', recursive=True))
+    # recordings used in the study: the 15 healthy recordings (P1, R1-R15) and one recording (R1)
+    # of each of the 24 valve-fault conditions (P2-P25)
+    D = f'{ROOT}/Raw_Data_Valve_Faults_DB_011V0'
+    files = [f'{D}/P1/R{i}P1.mat' for i in range(1, 16)] + [f'{D}/P{p}/R1P{p}.mat' for p in range(2, 26)]
+    missing = [f for f in files if not os.path.exists(f)]
+    if missing: sys.exit(f'Missing raw files, e.g. {missing[0]}')
     with Pool(2) as pool:
         out = pool.map(process, files)
-    meta = pd.DataFrame([m for m,_ in out]).drop(columns=['ratio_enc_over_50'])
+    meta = pd.DataFrame([m for m,_ in out])
     feats = pd.DataFrame([r for _,rows in out for r in rows])
     os.makedirs('data', exist_ok=True)
     meta.to_csv('data/recordings.csv', index=False)
