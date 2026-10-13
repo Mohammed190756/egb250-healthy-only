@@ -7,7 +7,11 @@ The code reproduces the numbers, tables and figures of the paper from the raw re
 ## Data
 The EGB-250 dataset is the property of GIDTEC, Universidad Politécnica Salesiana (Cuenca, Ecuador). It is **not included** in this repository. Researchers who wish to use it should contact the authors of the dataset reference cited in the paper.
 
-Place the raw `.mat` files in a folder and set `EGB250_RAW` to its path. The code reads the sub-folder `Raw_Data_Valve_Faults_DB_011V0`.
+Place the raw `.mat` files in a folder and set `EGB250_RAW` to its path. The code reads 39 files from the sub-folder `Raw_Data_Valve_Faults_DB_011V0`:
+- `P1/R1P1.mat` … `P1/R15P1.mat` (healthy baseline, 15 recordings);
+- `P2/R1P2.mat` … `P25/R1P25.mat` (one recording of each of the 24 valve-fault conditions).
+
+No other input is needed. Every other file is produced by the scripts.
 
 ## Environment
 - Python 3.13.
@@ -23,7 +27,7 @@ Place the raw `.mat` files in a folder and set `EGB250_RAW` to its path. The cod
 | 4 | `kmeans_k_selection.py 20` | elbow-based selection of k for K-Means (healthy data only) |
 | 5 | `make_tables.py` | primary metrics, bootstrap, seed stability, per-condition results, Friedman/Nemenyi, single-level protocol, threshold sensitivity (`tables/`) |
 | 6 | `figs.py pipeline variance rationale design sensor_groups embedding permutation shap` | Figs. 1–4, 9, 10, 11 and 13 |
-| 7 | `acquisition_table.py master_metadata.csv out.csv` | per-recording mean tank and stage pressures and shaft speed (Supplementary Table S16) |
+| 7 | `acquisition_table.py out.csv` | per-recording mean tank and stage pressures and shaft speed (Supplementary Table S16) |
 
 ### Notes on step 2
 - **Seeds:** the paper uses seeds 0–4 and 42 for the stochastic detectors (Isolation Forest, K-Means, Elliptic Envelope and the three neural networks), and seed 42 for the deterministic ones.
