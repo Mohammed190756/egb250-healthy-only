@@ -74,7 +74,7 @@ tops = list(cons.sort_values(ascending=False).index[:10])[::-1]          # botto
 L0 = L[0]
 def lab(c):
     f = L0.loc[c].sort_values(ascending=False).index[0]
-    return f'PC{c} · {f.replace("_", " ")}'
+    return f'PC{c} · {f}'
 fig = plt.figure(figsize=(6.3, 8.2))
 gs = fig.add_gridspec(2, 2, width_ratios=[1, 0.025], height_ratios=[1.35, 1], hspace=0.32, wspace=0.03)
 ax = fig.add_subplot(gs[0, 0]); cax = fig.add_subplot(gs[0, 1]); bx = fig.add_subplot(gs[1, 0])

@@ -6,6 +6,12 @@ into 48 time-aligned, non-overlapping 0.2-s windows (first 9.6 s). Each window i
 DC-removed (window mean subtracted) and described by 12 descriptors per channel
 (13 channels x 12 = 156 features). The encoder is used only to measure shaft speed.
 
+Current-clamp polarity: in some valve recordings one clamp was mounted in reverse, so the
+stored signal of that channel is the line current multiplied by -1. A phase check on the three
+line currents detects this (in a correct three-phase set the three currents nearly cancel) and
+the reversed channel is multiplied by -1 before feature extraction. Among the 12 descriptors,
+only the skewness depends on the sign of the signal.
+
 Set the environment variable EGB250_RAW to the folder that holds the GIDTEC raw files.
 """
 import numpy as np, scipy.io as sio, pandas as pd, re, glob, os, sys
@@ -46,6 +52,18 @@ def descriptors(x, fs, nps):
     return [sd, skew(x), kurtosis(x, fisher=False), x.max()-x.min(), pk/rms, rms/mab, pk/mab,
             cen, sk, np.sqrt(Pe[m][i]), fe[m][i], np.sqrt(np.mean(ec**2))]
 
+def fix_polarity(sig):
+    """Return the name of the current channel that was multiplied by -1, or '' if none."""
+    I = [sig[c] - sig[c].mean() for c in ('I1', 'I2', 'I3')]
+    line = np.mean([np.sqrt(np.mean(x**2)) for x in I])
+    resid = lambda J: np.sqrt(np.mean((J[0] + J[1] + J[2])**2)) / line
+    if resid(I) < 0.5:
+        return ''
+    k = int(np.argmin([resid([-x if i == j else x for i, x in enumerate(I)]) for j in range(3)]))
+    c = ('I1', 'I2', 'I3')[k]
+    sig[c] = -sig[c]
+    return c
+
 def process(path):
     rel = os.path.relpath(path, ROOT)
     sub = rel.split(os.sep)[0].replace('Raw_Data_','').replace('_Faults_DB_011V0','')
@@ -54,6 +72,7 @@ def process(path):
     d = M['data'][0,0]
     g = {'50': d['Analog50k'][0,0], '25': d['Analog25k'][0,0]}
     sig = {c: g[m][k].ravel().astype(float) for c,m,k in CHANNELS}
+    flipped = fix_polarity(sig)
     enc = d['Analog500k'][0,0]['TDMSAnalog500kEncoder0'].ravel()
     edges = np.flatnonzero(np.diff((enc > 0).astype(np.int8)) == 1)
     per = np.diff(edges)
@@ -61,7 +80,7 @@ def process(path):
     shaft_hz = FS500/np.median(per)
     meta = dict(subset=sub, P=P, R=R, rec=f'{sub}_{P}_{R}',
                 n50=len(sig['A1']), n25=len(sig['PR1']), n500=len(enc),
-                shaft_hz=shaft_hz, edges_total=len(edges))
+                shaft_hz=shaft_hz, edges_total=len(edges), clamp_flipped=flipped)
     rows = []
     for w in range(NWIN):
         r = dict(rec=meta['rec'], win=w)
@@ -78,9 +97,12 @@ def process(path):
 
 if __name__ == '__main__':
     # recordings used in the study: the 15 healthy recordings (P1, R1-R15) and one recording (R1)
-    # of each of the 24 valve-fault conditions (P2-P25)
+    # of each of the 24 valve-fault conditions (P2-P25); the 15 healthy recordings of the bearing
+    # sub-dataset (Bearing/P1) are scored only, as a healthy baseline from another session
     D = f'{ROOT}/Raw_Data_Valve_Faults_DB_011V0'
-    files = [f'{D}/P1/R{i}P1.mat' for i in range(1, 16)] + [f'{D}/P{p}/R1P{p}.mat' for p in range(2, 26)]
+    B = f'{ROOT}/Raw_Data_Bearing_Faults_DB_011V0'
+    files = ([f'{D}/P1/R{i}P1.mat' for i in range(1, 16)] + [f'{D}/P{p}/R1P{p}.mat' for p in range(2, 26)]
+             + [f'{B}/P1/R{i}P1.mat' for i in range(1, 16)])
     missing = [f for f in files if not os.path.exists(f)]
     if missing: sys.exit(f'Missing raw files, e.g. {missing[0]}')
     with Pool(2) as pool:
