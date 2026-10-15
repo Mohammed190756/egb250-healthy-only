@@ -7,9 +7,11 @@ The code reproduces the numbers, tables and figures of the paper from the raw re
 ## Data
 The EGB-250 dataset is the property of GIDTEC, Universidad Politécnica Salesiana (Cuenca, Ecuador). It is **not included** in this repository. Researchers who wish to use it should contact the authors of the dataset reference cited in the paper.
 
-Place the raw `.mat` files in a folder and set `EGB250_RAW` to its path. The code reads 39 files from the sub-folder `Raw_Data_Valve_Faults_DB_011V0`:
-- `P1/R1P1.mat` … `P1/R15P1.mat` (healthy baseline, 15 recordings);
-- `P2/R1P2.mat` … `P25/R1P25.mat` (one recording of each of the 24 valve-fault conditions).
+Place the raw `.mat` files in a folder and set `EGB250_RAW` to its path. The code reads 54 files:
+- from `Raw_Data_Valve_Faults_DB_011V0`: `P1/R1P1.mat` … `P1/R15P1.mat` (healthy baseline, 15 recordings) and `P2/R1P2.mat` … `P25/R1P25.mat` (one recording of each of the 24 valve-fault conditions);
+- from `Raw_Data_Bearing_Faults_DB_011V0`: `P1/R1P1.mat` … `P1/R15P1.mat` (healthy baseline of the same machine recorded in another session; scored only, never used for fitting or calibration).
+
+In some valve recordings one current clamp was mounted in reverse. `extract.py` detects the reversed channel with a phase check of the three line currents and multiplies it by −1 before feature extraction (column `clamp_flipped` of `data/recordings.csv`).
 
 No other input is needed. Every other file is produced by the scripts.
 
@@ -24,19 +26,20 @@ No other input is needed. Every other file is produced by the scripts.
 | 1 | `extract.py` | `data/features.parquet` (156 features per 0.2-s window), `data/recordings.csv` |
 | 2 | `run_nested.py Valve <seed> <models> [group]` | nested LORO scores and thresholds in `runs/` (all channels) and `runs_groups/` (sensor groups) |
 | 3 | `explain.py Valve 0,3,6,9,12 perm`, `explain.py Valve 0,5,10 shap`, `shap_analysis.py` | permutation importance and Kernel SHAP on held-out data |
-| 4 | `kmeans_k_selection.py 20` | elbow-based selection of k for K-Means (healthy data only) |
-| 5 | `make_tables.py` | primary metrics, bootstrap, seed stability, per-condition results, Friedman/Nemenyi, single-level protocol, threshold sensitivity (`tables/`) |
+| 4 | `kmeans_k_selection.py 20`, `pca_tables.py` | elbow-based selection of k for K-Means (healthy data only); PCA variance and loadings of the final and outer-fold-1 fits |
+| 5 | `make_tables.py`, `extra_tables.py` | primary metrics, bootstrap, seed stability, per-condition results, Friedman/Nemenyi, single-level protocol, threshold sensitivity; microphone-free configuration, specificity on the Bearing/P1 baseline and PCA-retention sensitivity (`tables/`) |
 | 6 | `figs.py pipeline variance rationale design sensor_groups embedding permutation shap` | Figs. 1–4, 9, 10, 11 and 13 |
-| 7 | `acquisition_table.py out.csv` | per-recording mean tank and stage pressures and shaft speed (Supplementary Table S16) |
+| 7 | `acquisition_table.py out.csv` | per-recording mean tank and stage pressures, encoder speed and pressure-spectrum speed (Supplementary Table S16) |
 
 ### Notes on step 2
 - **Seeds:** the paper uses seeds 0–4 and 42 for the stochastic detectors (Isolation Forest, K-Means, Elliptic Envelope and the three neural networks), and seed 42 for the deterministic ones.
 - **Sensor groups:** `accel`, `mic`, `current`, `pressure` and `nomic` (all channels except the microphones). The single-group analysis uses the eight non-neural detectors at seed 42.
-- **Microphone-free configuration:** run step 2 with group `nomic` for all eleven detectors, with the same seeds as above.
-- **PCA-retention sensitivity:** run step 2 with `PCA_VAR=0.95 PCA_CAP=1000` or `PCA_VAR=0.99 PCA_CAP=1000`, or with `NO_PCA=1` for Isolation Forest, One-Class SVM and LOF. Set `OUTDIR` to keep these runs apart.
+- **Microphone-free configuration:** run step 2 with group `nomic` for all eleven detectors, with the same seeds as above, and `OUTDIR=runs_nomic`.
+- **Other session:** every outer-fold model also scores the Bearing/P1 windows; `extra_tables.py` reports the share flagged at the 99th-percentile threshold.
+- **PCA-retention sensitivity:** run step 2 with `PCA_VAR=0.95 PCA_CAP=1000` or `PCA_VAR=0.99 PCA_CAP=1000`, or with `NO_PCA=1` for Isolation Forest, One-Class SVM and LOF. Set `OUTDIR` to `runs_p95`, `runs_p99` or `runs_nopca` to keep these runs apart.
 
 ### Remaining figures
-Figs. 5–8, 12, 14 and 15 are plots of the tables written in steps 3 and 5. Their values are listed in the supplementary tables of the paper.
+Figs. 5–8, 14 and 15 are plots of the tables written in steps 3 and 5, and Fig. 12 is written by `shap_analysis.py`. Their values are listed in the supplementary tables of the paper.
 
 ## Detectors
 - **Detectors** (`models.py`), all trained on healthy data only: Isolation Forest, One-Class SVM, Autoencoder, VAE, LSTM Autoencoder, LOF, K-Means (k = 5), DBSCAN, Z-Score, Mahalanobis distance and Elliptic Envelope.
